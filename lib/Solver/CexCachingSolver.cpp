@@ -296,6 +296,29 @@ bool CexCachingSolver::quickMatch(const Query &query,
 	return false;
 }
 
+bool queryExprEvaluatesToTrue(Assignment * &assignment, const ref<Expr> &queryExpr){
+	ref<Expr> neg = Expr::createIsZero(queryExpr);
+	ref<Expr> q = assignment->evaluate(neg);
+
+	assert(isa<ConstantExpr>(q) && "assignment evaluation did not result in constant");
+	if(cast<ConstantExpr>(q)->isTrue()){
+		return true;
+	}else{
+		return false;
+	}
+}
+
+bool parentKeyEvaluatesToTrue(Assignment *&assignment, const std::set<ref<Expr> > &parentKey){
+	for(std::set<ref<Expr> >::const_iterator it = parentKey.begin(); it != parentKey.end(); it ++){
+		ref<Expr> q = assignment->evaluate(*it);
+		assert(isa<ConstantExpr>(q) && "assignment evaluation did not result in constant");
+		if(cast<ConstantExpr>(q)->isTrue()){
+			return false;
+		}
+	}
+	return true;
+}
+
 bool CexCachingSolver::checkPreviousSolutionHelper(const ref<Expr> queryExpr,	//If anything other than query.expr, then negated.
 										   const std::set<ref<Expr> > &key,
 										   Assignment * &result){
@@ -312,11 +335,7 @@ bool CexCachingSolver::checkPreviousSolutionHelper(const ref<Expr> queryExpr,	//
 			 * we can now check whether this parent solution satisfies the
 			 * child state.  There's a pretty good chance... at least 50/50
 			 */
-			ref<Expr> neg = Expr::createIsZero(queryExpr);
-			ref<Expr> q = parentSolution->evaluate(neg);
-
-			assert(isa<ConstantExpr>(q) && "assignment evaluation did not result in constant");
-			if(cast<ConstantExpr>(q)->isTrue()){
+			if(queryExprEvaluatesToTrue(parentSolution, queryExpr)){
 				result = parentSolution;
 				return true;
 			}else{
