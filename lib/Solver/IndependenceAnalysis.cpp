@@ -111,6 +111,19 @@ bool IndependentElementSet::intersects(const IndependentElementSet &b) {
 	return false;
 }
 
+bool IndependentElementSet::intersectsUnsafe(const IndependentElementSet &b) {
+	for (elements_ty::iterator it = elements.begin(), ie = elements.end();
+			it != ie; ++it) {
+		const Array *array = it->first;
+		elements_ty::const_iterator it2 = b.elements.find(array);
+		if (it2 != b.elements.end()) {
+			if (it->second.intersects(it2->second))
+				return true;
+		}
+	}
+	return false;
+}
+
 // returns true iff set is changed by addition
 bool IndependentElementSet::add(const IndependentElementSet &b) {
 
@@ -262,6 +275,41 @@ void getAllFactors(const Query& query, std::list<IndependentElementSet> * &facto
 		delete factors;
 		factors = done;
 	}while(!doneLoop);
+}
+
+IndependentElementSet getFreshFactorUnsafe(const std::vector<ref<Expr> > vector,
+										   const ref<Expr> &expr,
+										   std::vector< ref<Expr> > &result) {
+	IndependentElementSet eltsClosure(expr); //The new thing we're testing
+	std::vector< std::pair<ref<Expr>, IndependentElementSet> > worklist;
+
+	for (ConstraintManager::const_iterator it = vector.begin(),
+			ie = vector.end(); it != ie; ++it)
+		//iterate through all the previously separated constraints
+		worklist.push_back(std::make_pair(*it, IndependentElementSet(*it)));
+
+	// XXX This should be more efficient (in terms of low level copy stuff).
+	bool done = false;
+	do {
+		done = true;
+		//The pair below keeps track of <Expr, Set<Variables in Expression>>
+		std::vector< std::pair<ref<Expr>, IndependentElementSet> > newWorklist;
+		for (std::vector< std::pair<ref<Expr>, IndependentElementSet> >::iterator
+				it = worklist.begin(), ie = worklist.end(); it != ie; ++it) {
+			IndependentElementSet next = it->second;
+			if (next.intersectsUnsafe(eltsClosure)) {
+				if (eltsClosure.add(next))
+					done = false;	//Means that we have added (z=y)added to (x=y)
+				//Now need to see if there are any (z=?)'s
+				result.push_back(it->first);
+			} else {
+				newWorklist.push_back(*it);
+			}
+		}
+		worklist.swap(newWorklist);
+	} while (!done);
+
+	return eltsClosure;
 }
 
 void calculateArrays(const IndependentElementSet & ie, std::vector<const Array *> &returnVector){
