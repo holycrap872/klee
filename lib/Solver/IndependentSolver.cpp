@@ -86,13 +86,20 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 }
 
 class IndependentElementSet {
-  typedef std::map<const Array*, ::DenseSet<unsigned> > elements_ty;
-  elements_ty elements;
-  std::set<const Array*> wholeObjects;
-
 public:
+  typedef std::map<const Array*, ::DenseSet<unsigned> > elements_ty;
+  elements_ty elements;					//Represents individual elements of array accesses (arr[1])
+  std::set<const Array*> wholeObjects;	//Represents symbolically accessed arrays (arr[x])
+  std::vector<ref<Expr> > exprs;		//All expressions that are associated with this factor
+
   IndependentElementSet() {}
   IndependentElementSet(ref<Expr> e) {
+    exprs.push_back(e);
+    // Track all reads in the program.  Determines whether reads are
+    //concrete or symbolic.  If they are symbolic, "collapses" array
+    //by adding it to wholeObjects.  Otherwise, creates a mapping of
+    //the form Map<array, set<index>> which tracks which parts of the
+    //array are being accessed
     std::vector< ref<ReadExpr> > reads;
     findReads(e, /* visitUpdates= */ true, reads);
     for (unsigned i = 0; i != reads.size(); ++i) {
@@ -106,6 +113,8 @@ public:
 
       if (!wholeObjects.count(array)) {
         if (ConstantExpr *CE = dyn_cast<ConstantExpr>(re->index)) {
+          //if index constant, then add to set of constraints operating
+          //on that array (actually, don't add constraint, just set index)
           ::DenseSet<unsigned> &dis = elements[array];
           dis.add((unsigned) CE->getZExtValue(32));
         } else {
@@ -119,11 +128,18 @@ public:
   }
   IndependentElementSet(const IndependentElementSet &ies) : 
     elements(ies.elements),
-    wholeObjects(ies.wholeObjects) {}    
+    wholeObjects(ies.wholeObjects),
+	exprs(ies.exprs){}
 
   IndependentElementSet &operator=(const IndependentElementSet &ies) {
     elements = ies.elements;
     wholeObjects = ies.wholeObjects;
+
+    for(unsigned i = 0; i < ies.exprs.size(); i ++){
+    	ref<Expr> expr = ies.exprs[i];
+    	exprs.push_back(expr);
+    }
+
     return *this;
   }
 
@@ -160,6 +176,7 @@ public:
 
   // more efficient when this is the smaller set
   bool intersects(const IndependentElementSet &b) {
+	 //If there are any symbolic arrays in our query that b accesses
     for (std::set<const Array*>::iterator it = wholeObjects.begin(), 
            ie = wholeObjects.end(); it != ie; ++it) {
       const Array *array = *it;
@@ -170,9 +187,11 @@ public:
     for (elements_ty::iterator it = elements.begin(), ie = elements.end();
          it != ie; ++it) {
       const Array *array = it->first;
+      //if the array we access is symbolic in b
       if (b.wholeObjects.count(array))
         return true;
       elements_ty::const_iterator it2 = b.elements.find(array);
+      //if any of the elements we access are also accessed by b
       if (it2 != b.elements.end()) {
         if (it->second.intersects(it2->second))
           return true;
@@ -183,6 +202,11 @@ public:
 
   // returns true iff set is changed by addition
   bool add(const IndependentElementSet &b) {
+	for(unsigned i = 0; i < b.exprs.size(); i ++){
+			ref<Expr> expr = b.exprs[i];
+	  	  exprs.push_back(expr);
+	}
+	std::set<const Array*> seen;
     bool modified = false;
     for (std::set<const Array*>::const_iterator it = b.wholeObjects.begin(), 
            ie = b.wholeObjects.end(); it != ie; ++it) {
@@ -207,7 +231,8 @@ public:
         if (it2==elements.end()) {
           modified = true;
           elements.insert(*it);
-        } else {
+        } else {//Now need to see if there are any (z=?)'s
+
           if (it2->second.add(it->second))
             modified = true;
         }
@@ -242,7 +267,8 @@ IndependentElementSet getIndependentConstraints(const Query& query,
            it = worklist.begin(), ie = worklist.end(); it != ie; ++it) {
       if (it->second.intersects(eltsClosure)) {
         if (eltsClosure.add(it->second))
-          done = false;
+          done = false; //Means that we have added (z=y)added to (x=y)
+        //Now need to see if there are any (z=?)'s
         result.push_back(it->first);
       } else {
         newWorklist.push_back(*it);
