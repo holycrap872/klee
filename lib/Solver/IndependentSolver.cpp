@@ -16,11 +16,13 @@
 #include "klee/Internal/Support/Debug.h"
 
 #include "klee/util/ExprUtil.h"
+#include "klee/util/Assignment.h"
 
 #include "llvm/Support/raw_ostream.h"
 #include <map>
 #include <vector>
 #include <ostream>
+#include <list>
 
 using namespace klee;
 using namespace llvm;
@@ -248,8 +250,74 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
+/*
+ * Breaks down a constraint into all of it's individual pieces, returning a
+ * list of IndependentElementSets or the independent factors.
+ */
+static
+void getAllFactors(const Query& query, std::list<IndependentElementSet> * &factors ){
+	assert(factors && "should not pass in a null vector");
+	ConstantExpr *CE = dyn_cast<ConstantExpr>(query.expr);
+
+	/*
+	 * If the query.expr is false, we can simply ignore it.  Otherwise, we need to
+	 * negate it and add it to the list of factors.
+	 */
+	if(CE){
+		assert(CE && CE->isFalse() && "the expr should always be false and therefore not included in factors");
+	}else{
+		ref<Expr> neg = Expr::createIsZero(query.expr);
+		factors->push_back(IndependentElementSet(neg));
+	}
+
+	for (ConstraintManager::const_iterator it = query.constraints.begin(),
+			ie = query.constraints.end(); it != ie; ++it)
+		//iterate through all the previously separated constraints.  Until we
+		//actually return, factors is treated as a queue of expressions to be
+		//evaluated.  If the queue property isn't maintained, then the exprs
+		//could be returned in an order different from how they came it, negatively
+		//affecting later stages.
+		factors->push_back(IndependentElementSet(*it));
+
+	bool doneLoop = false;
+	do {
+		doneLoop = true;
+		std::list<IndependentElementSet> * done = new std::list<IndependentElementSet>;
+		while(factors->size() > 0){
+			IndependentElementSet current = factors->front();
+			factors->pop_front();
+			std::set<const Array*> seen;
+
+			//This list represents the set of factors that are separate from current.
+			//Those that are not inserted into this list (queue) intersect with current.
+			std::list<IndependentElementSet> *keep = new std::list<IndependentElementSet>;
+			while(factors->size() > 0){
+				IndependentElementSet compare = factors->front();
+				factors->pop_front();
+				if(current.intersects(compare)){
+					if (current.add(compare)){
+						/*
+						 * Means that we have added (z=y)added to (x=y)
+						 * Now need to see if there are any (z=?)'s
+						 */
+						 doneLoop = false;
+					}
+				}else{
+					keep->push_back(compare);
+				}
+			}
+			done->push_back(current);
+			delete factors;
+			factors = keep;
+
+		}
+		delete factors;
+		factors = done;
+	}while(!doneLoop);
+}
+
 static 
-IndependentElementSet getIndependentConstraints(const Query& query,
+IndependentElementSet getFreshFactor(const Query& query,
                                                 std::vector< ref<Expr> > &result) {
   IndependentElementSet eltsClosure(query.expr);
   std::vector< std::pair<ref<Expr>, IndependentElementSet> > worklist;
@@ -296,6 +364,31 @@ IndependentElementSet getIndependentConstraints(const Query& query,
   return eltsClosure;
 }
 
+/*
+ * Extracts which arrays are referenced from a particular independent set.  Examines both
+ * the actual known array accesses arr[1] plus the undetermined accesses arr[x].
+ */
+static
+void calculateArrays(const IndependentElementSet & ie, std::vector<const Array *> &returnVector){
+	//Now need to some how extract the arrays from these pieces...
+	std::set<const Array*> thisSeen;
+	for(std::map<const Array*, ::DenseSet<unsigned> >::const_iterator it = ie.elements.begin(); it != ie.elements.end(); it ++){
+		const Array* arr = it->first;
+		thisSeen.insert(arr);
+	}
+
+	for(std::set<const Array *>::iterator it = ie.wholeObjects.begin(); it != ie.wholeObjects.end(); it ++){
+		const Array* arr = * it;
+		thisSeen.insert(arr);
+	}
+
+	for(std::set<const Array *>::iterator it = thisSeen.begin(); it != thisSeen.end(); it ++){
+		const Array * arr = * it;
+		returnVector.push_back(arr);
+	}
+}
+
+
 class IndependentSolver : public SolverImpl {
 private:
   Solver *solver;
@@ -324,7 +417,7 @@ bool IndependentSolver::computeValidity(const Query& query,
                                         Solver::Validity &result) {
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure =
-    getIndependentConstraints(query, required);
+    getFreshFactor(query, required);
   ConstraintManager tmp(required);
   return solver->impl->computeValidity(Query(tmp, query.expr), 
                                        result);
@@ -333,7 +426,7 @@ bool IndependentSolver::computeValidity(const Query& query,
 bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure = 
-    getIndependentConstraints(query, required);
+    getFreshFactor(query, required);
   ConstraintManager tmp(required);
   return solver->impl->computeTruth(Query(tmp, query.expr), 
                                     isValid);
@@ -342,7 +435,7 @@ bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
 bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure = 
-    getIndependentConstraints(query, required);
+    getFreshFactor(query, required);
   ConstraintManager tmp(required);
   return solver->impl->computeValue(Query(tmp, query.expr), result);
 }
