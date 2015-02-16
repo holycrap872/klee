@@ -12,12 +12,12 @@
 
 #include "klee/Expr.h"
 #include "klee/Constraints.h"
-#include "IndependenceAnalysis.h"
 #include "klee/SolverImpl.h"
 #include "klee/Internal/Support/Debug.h"
 
 #include "klee/util/ExprUtil.h"
 #include "klee/util/Assignment.h"
+#include "klee/util/IndependenceAnalysis.h"
 
 #include "llvm/Support/raw_ostream.h"
 #include <map>

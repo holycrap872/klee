@@ -5,7 +5,7 @@
  *      Author: ericrizzi
  */
 
-#include "IndependenceAnalysis.h"
+#include "klee/util/IndependenceAnalysis.h"
 
 /*
  * Keeps track of all reads in a single Constraint.  Maintains
@@ -277,14 +277,14 @@ void getAllFactors(const Query& query, std::list<IndependentElementSet> * &facto
 	}while(!doneLoop);
 }
 
-IndependentElementSet getFreshFactorUnsafe(const std::vector<ref<Expr> > vector,
+IndependentElementSet getFreshFactorUnsafe(const std::set<ref<Expr> > parentKey,
 										   const ref<Expr> &expr,
 										   std::vector< ref<Expr> > &result) {
 	IndependentElementSet eltsClosure(expr); //The new thing we're testing
 	std::vector< std::pair<ref<Expr>, IndependentElementSet> > worklist;
 
-	for (ConstraintManager::const_iterator it = vector.begin(),
-			ie = vector.end(); it != ie; ++it)
+	for (std::set<ref<Expr> >::const_iterator it = parentKey.begin(),
+			ie = parentKey.end(); it != ie; ++it)
 		//iterate through all the previously separated constraints
 		worklist.push_back(std::make_pair(*it, IndependentElementSet(*it)));
 
