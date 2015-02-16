@@ -144,7 +144,7 @@ class CexCachingSolver : public SolverImpl {
 
   bool quickMatch(const Query &query, const KeyType &key, Assignment *&result);
 
-  bool checkPreviousSolutionHelper(const ref<Expr>, const std::set<ref<Expr> > &key, Assignment * &result);
+  bool checkPreviousSolutionHelper(const ref<Expr>, const std::set<ref<Expr> > &key, Assignment * &parentSolution, Assignment * &result);
   bool checkPreviousSolution(const Query &query, Assignment *&result);
 
   bool getAssignment(const Query& query, Assignment *&result);
@@ -321,8 +321,8 @@ bool parentKeyEvaluatesToTrue(Assignment *&assignment, const std::set<ref<Expr> 
 
 bool CexCachingSolver::checkPreviousSolutionHelper(const ref<Expr> queryExpr,	//If anything other than query.expr, then negated.
 										   const std::set<ref<Expr> > &key,
+										   Assignment * &parentSolution,
 										   Assignment * &result){
-	Assignment * parentSolution;
 	if(getFromQuickCache(key, parentSolution)){
 		if(!parentSolution){
 			//means that the the previous state was UNSAT and therefore the
@@ -344,6 +344,7 @@ bool CexCachingSolver::checkPreviousSolutionHelper(const ref<Expr> queryExpr,	//
 				 * went along the opposing branch and it won't help us at this stage.  The
 				 * value stored in oldAnswer could help someone though.
 				 */
+				assert(parentSolution);
 				assert(!result);
 				return false;
 			}
@@ -379,7 +380,8 @@ bool CexCachingSolver::checkPreviousSolution(const Query &query,
 		queryExpr = query.expr;
 	}
 
-	if(checkPreviousSolutionHelper(queryExpr, parentKey, result)){
+	Assignment * parentSolution = 0;
+	if(checkPreviousSolutionHelper(queryExpr, parentKey, parentSolution, result)){
 		/*
 		 * result may contain one of two things
 		 * 	- A 0, meaning that the previous piece of the was UNSAT and therefore new is too
@@ -391,7 +393,6 @@ bool CexCachingSolver::checkPreviousSolution(const Query &query,
 		return false;
 	}
 }
-
 
 /// lookupAssignment - Lookup a cached result for the given \arg query.
 ///
