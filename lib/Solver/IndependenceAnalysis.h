@@ -107,9 +107,9 @@ class IndependentElementSet {
 public:
 	typedef std::map<const Array*, ::DenseSet<unsigned> > elements_ty;
 
-	elements_ty elements;
-	std::set<const Array*> wholeObjects;	//Pretty sure represents symbolic accessed arrays
-	std::vector<ref<Expr> > exprs;
+	elements_ty elements;                   //Represents individual elements of array accesses (arr[1])
+	std::set<const Array*> wholeObjects;    //Represents symbolically accessed arrays (arr[x])
+	std::vector<ref<Expr> > exprs;  		//All expressions that are associated with this factor
 
 	IndependentElementSet();
 	IndependentElementSet(ref<Expr> e);
