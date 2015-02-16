@@ -445,6 +445,31 @@ bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
   return solver->impl->computeValue(Query(tmp, query.expr), result);
 }
 
+/*
+ * Used only for assertions to make sure point created during computeInitialValues
+ * is in fact correct.
+ */
+bool createdPointEvaluatesToTrue(const Query &query,
+               const std::vector<const Array*> &objects,
+               std::vector< std::vector<unsigned char> > &values){
+
+       Assignment assign = Assignment(objects, values);
+
+       for(ConstraintManager::constraint_iterator it = query.constraints.begin();
+                       it != query.constraints.end(); ++it){
+               ref<Expr> ret = assign.evaluate(*it);
+               if(! isa<ConstantExpr>(ret) || ! cast<ConstantExpr>(ret)->isTrue()){
+                       return false;
+               }
+       }
+
+       ref<Expr> neg = Expr::createIsZero(query.expr);
+       ref<Expr> q = assign.evaluate(neg);
+
+       assert(isa<ConstantExpr>(q) && "assignment evaluation did not result in constant");
+       return cast<ConstantExpr>(q)->isTrue();
+}
+
 bool IndependentSolver::computeInitialValues(const Query& query,
 		const std::vector<const Array*> &objects,
 		std::vector< std::vector<unsigned char> > &values,
@@ -509,6 +534,8 @@ bool IndependentSolver::computeInitialValues(const Query& query,
 			values.push_back(retMap[arr]);
 		}
 	}
+
+	assert(createdPointEvaluatesToTrue(query, objects, values) && "should satisfy the equation");
 
 	delete factors;
 	return true;
