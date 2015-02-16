@@ -120,6 +120,24 @@ public:
 	// more efficient when this is the smaller set
 	bool intersects(const IndependentElementSet &b);
 
+	/*
+	 * Calculates whether two particular IndependentElementSets intersect
+	 * by examining ONLY the indices of the arrays that they operate on.
+	 * This means that IES's that do not share elements but do share
+	 * whole objects are not considering intersecting.
+	 *
+	 * As a clarifying example, if IES1 = {arr[1]>6} and IES2 = {arr[1]<10},
+	 * this function would consider IES1 and IES2 to be intersecting.
+	 *
+	 * If, instead IES1 = {arr[x]>6} and IES2 == {arr[1]<10}, this function
+	 * would consider them independent.
+	 *
+	 * NOTE: As seen in the name, this is an unsafe operation and is only
+	 * suitable for optimizations that account for this... Namely the
+	 * GuessSplit optimization in the CexCachingSolver.
+	 */
+	bool intersectsUnsafe(const IndependentElementSet &b);
+
 	// returns true iff set is changed by addition
 	bool add(const IndependentElementSet &b);
 
@@ -148,6 +166,16 @@ IndependentElementSet getFreshFactor(const Query& query, std::vector<ref<Expr> >
  * list of IndependentElementSets or the independent factors.
  */
 void getAllFactors(const Query& query, std::list<IndependentElementSet> * &factors );
+
+/*
+ * As detailed in IndependentElementSet::intersectsUnsafe(), this function only considers
+ * the ref<Expr> of a query to intersect if they directly and explicitly reference the
+ * same element of the array.  They do not consider ref<Expr> that share "wholeObjects"
+ * to be intersecting.  As stated above, this is an unsafe funtion and should only be
+ * use for optimizations that handle it correctly...Namely the GuessSplit optimization of
+ * the CexCachingSolver.
+ */
+IndependentElementSet getFreshFactorUnsafe(const std::set<ref<Expr> > parentKey, const ref<Expr> &expr, std::vector<ref<Expr> > &result);
 
 /*
  * Extracts which arrays are referenced from a particular independent set.  Examines both
