@@ -13,6 +13,7 @@
 #include <map>
 
 #include "klee/util/ExprEvaluator.h"
+#include "klee/util/IndependenceAnalysis.h"
 
 // FIXME: Rename?
 
@@ -44,6 +45,65 @@ namespace klee {
       }
     }
     
+    /*
+     * Overwrites an existing solution with selected (via the ies) parts of
+     * a new solution.
+     */
+    Assignment(const Assignment &existing,
+    		const Assignment &overwriting,
+			const IndependentElementSet ies,
+			bool _allowFreeValues=false) : allowFreeValues(_allowFreeValues){
+
+
+    	//Fill the new assignment with all of the existing values
+    	for(bindings_ty::const_iterator it = existing.bindings.begin(); it != existing.bindings.end(); it ++){
+    		const Array * array = it->first;
+    		std::vector<unsigned char> answers = it -> second;
+
+    		this->bindings.insert(std::make_pair(array, answers));
+    	}
+
+    	//Go through the new, overwriting answer's array's.
+    	for(std::map<const Array*, ::DenseSet<unsigned> >::const_iterator it2 = ies.elements.begin(); it2 != ies.elements.end(); it2 ++){
+    		const Array * array = it2 -> first;  //the array we're working with
+
+    		bindings_ty::const_iterator overWriteITE = overwriting.bindings.find(array);
+    		assert(overWriteITE!=bindings.end() && "this would mean that the SMT solver didn't return a full answer");
+    		std::vector<unsigned char> newAnswers = overWriteITE->second;
+    		//above is equivalent to "newAnswers = overwriting.bindings[array]"
+
+    		if(this->bindings.count(array)){
+    			/*
+    			 * If there is a colliding solution, we need to carefully go through
+    			 * and only replace the elements of the answer that are in the factor
+    			 */
+    			bindings_ty::const_iterator existingWriteITE = bindings.find(array);
+    			assert(existingWriteITE!=bindings.end());
+    			std::vector<unsigned char> oldAnswers = existingWriteITE->second;
+    			this->bindings.erase(array);
+    			//above is equivalent to "oldAnswers = bindings[array]"
+
+
+    			::DenseSet<unsigned> ds = it2 -> second;
+    			for(std::set<unsigned>::iterator it2 = ds.begin(); it2 != ds.end(); it2++){
+    				unsigned index = * it2;
+    				oldAnswers[index] = newAnswers[index];
+    			}
+
+    			this->bindings.insert(std::make_pair(array, oldAnswers));
+    		}else{
+    			/*
+    			 * If there is no colliding solution, we can just through the answer
+    			 * of new solution into the answer without fear of overwriting any
+    			 * old useful information.  On second through, this seems highly unlikely
+    			 * since previous solver, (think independence solver) would have caught
+    			 * this case.
+    			 */
+    			this->bindings.insert(std::make_pair(array, newAnswers));
+    		}
+    	}
+    }
+
     ref<Expr> evaluate(const Array *mo, unsigned index) const;
     ref<Expr> evaluate(ref<Expr> e);
 
