@@ -756,11 +756,11 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
          cpn && (cpn->statistics.getValue(stats::forks) > 
                  stats::forks*MaxStaticCPForkPct)) ||
         (MaxStaticSolvePct<1 &&
-         sm.getIndexedValue(stats::solverTime, sm.getIndex()) > 
-         stats::solverTime*MaxStaticSolvePct) ||
+         sm.getIndexedValue(stats::solverChainTime, sm.getIndex()) >
+         stats::solverChainTime*MaxStaticSolvePct) ||
         (MaxStaticCPForkPct<1. &&
-         cpn && (cpn->statistics.getValue(stats::solverTime) > 
-                 stats::solverTime*MaxStaticCPSolvePct))) {
+         cpn && (cpn->statistics.getValue(stats::solverChainTime) >
+                 stats::solverChainTime*MaxStaticCPSolvePct))) {
       ref<ConstantExpr> value; 
       bool success = solver->getValue(current, condition, value);
       assert(success && "FIXME: Unhandled solver failure");
