@@ -389,11 +389,26 @@ void StatsTracker::writeStatsHeader() {
              << "'WallTime',"
              << "'CoveredInstructions',"
              << "'UncoveredInstructions',"
-             << "'QueryTime',"
-             << "'SolverTime',"
+             << "'SolverChainTime',"
+             << "'IndependentSolverTime',"
+             << "'CachingSolvingTime',"
              << "'CexCacheTime',"
+             << "'SMTTime',"
              << "'ForkTime',"
              << "'ResolveTime',"
+             << "'Forks',"
+             << "|Cex|"
+             << "'LookupH',"
+             << "'QuickH',"
+             << "'PrevH',"
+             << "'UBH',"
+             << "('SuperH',"
+             << "'SubH'),"
+             << "'UBT',"
+             << "('SuperT',"
+             << "'SubT'),"
+             << "'H',"
+             << "'M',"
 #ifdef DEBUG
 	     << "'ArrayHashTime',"
 #endif
@@ -423,11 +438,26 @@ void StatsTracker::writeStatsLine() {
              << "," << elapsed()
              << "," << stats::coveredInstructions
              << "," << stats::uncoveredInstructions
-             << "," << stats::queryTime / 1000000.
-             << "," << stats::solverTime / 1000000.
-             << "," << stats::cexCacheTime / 1000000.
+             << "," << stats::solverChainTime / 1000000.
+             << "," << stats::independentTime / 1000000.
+             << "," << stats::cacheTime / 1000000.
+             << "," << stats::cexTime / 1000000.
+             << "," << stats::smtTime / 1000000.
              << "," << stats::forkTime / 1000000.
              << "," << stats::resolveTime / 1000000.
+             << "," << stats::forks
+             << "|Cex|"
+             << "," << stats::cexLookupHits
+             << "," << stats::cexQuickHits
+             << "," << stats::cexPrevHits
+             << "," << stats::cexUBHits
+             << ",(" << stats::cexUBSuperHits
+             << "," << stats::cexUBSubHits
+             << ")," << stats::cexUBTime / 1000000.
+             << ",(" << stats::cexUBSuperTime / 1000000.
+             << "," << stats::cexUBSubTime / 1000000.
+             << ")," << stats::cexHits
+             << "," << stats::cexMisses
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif

@@ -162,8 +162,11 @@ struct NullOrSatisfyingAssignment {
 /// unsatisfiable query).
 /// \return - True if a cached result was found.
 bool CexCachingSolver::searchForAssignment(KeyType &key, Assignment *&result) {
+  TimerStatIncrementer t(stats::cexUBTime);
+
   Assignment * const *lookup = cache.lookup(key);
   if (lookup) {
+    ++stats::cexLookupHits;
     result = *lookup;
     return true;
   }
@@ -198,15 +201,27 @@ bool CexCachingSolver::searchForAssignment(KeyType &key, Assignment *&result) {
 
     // Look for a satisfying assignment for a superset, which is trivially an
     // assignment for any subset.
-    Assignment **lookup = cache.findSuperset(key, NonNullAssignment());
+    Assignment **lookup = 0;
+    if(!lookup) {
+      TimerStatIncrementer tSuper(stats::cexUBSuperTime);
+      lookup = cache.findSuperset(key, NonNullAssignment());
+      if(lookup) {
+        ++stats::cexUBSuperHits;
+      }
+    }
 
     // Otherwise, look for a subset which is unsatisfiable -- if the subset is
     // unsatisfiable then no additional constraints can produce a valid
     // assignment. While searching subsets, we also explicitly the solutions for
     // satisfiable subsets to see if they solve the current query and return
     // them if so. This is cheap and frequently succeeds.
-    if (!lookup) 
+    if (!lookup) {
+      TimerStatIncrementer tSub(stats::cexUBSubTime);
       lookup = cache.findSubset(key, NullOrSatisfyingAssignment(key));
+      if(lookup) {
+        ++stats::cexUBSubHits;
+      }
+    }
 
     // If either lookup succeeded, then we have a cached solution.
     if (lookup) {
@@ -328,7 +343,7 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(neg)) {
     if (CE->isFalse()) {
       result = (Assignment*) 0;
-      ++stats::queryCexCacheHits;
+      ++stats::cexHits;
       return true;
     }
   } else {
@@ -336,10 +351,14 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
   }
 
   bool found = getFromQuickCache(key, result);
+  if(found){
+    ++stats::cexQuickHits;
+  }
 
   if (!found){
     found = checkPreviousSolution(query, result);
     if (found){
+      ++stats::cexPrevHits;
       insertInQuickCache(key, result);
     }
   }
@@ -347,14 +366,15 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
   if (!found){
     found = searchForAssignment(key, result);
     if (found){
+      ++stats::cexUBHits;
       insertInQuickCache(key, result);
     }
   }
 
   if (found)
-    ++stats::queryCexCacheHits;
+    ++stats::cexHits;
   else
-    ++stats::queryCexCacheMisses;
+    ++stats::cexMisses;
     
   return found;
 }
@@ -410,7 +430,7 @@ CexCachingSolver::~CexCachingSolver() {
 
 bool CexCachingSolver::computeValidity(const Query& query,
                                        Solver::Validity &result) {
-  TimerStatIncrementer t(stats::cexCacheTime);
+  TimerStatIncrementer t(stats::cexTime);
   Assignment *a;
   if (!getAssignment(query.withFalse(), a))
     return false;
@@ -434,7 +454,7 @@ bool CexCachingSolver::computeValidity(const Query& query,
 
 bool CexCachingSolver::computeTruth(const Query& query,
                                     bool &isValid) {
-  TimerStatIncrementer t(stats::cexCacheTime);
+  TimerStatIncrementer t(stats::cexTime);
 
   // There is a small amount of redundancy here. We only need to know
   // truth and do not really need to compute an assignment. This means
@@ -461,7 +481,7 @@ bool CexCachingSolver::computeTruth(const Query& query,
 
 bool CexCachingSolver::computeValue(const Query& query,
                                     ref<Expr> &result) {
-  TimerStatIncrementer t(stats::cexCacheTime);
+  TimerStatIncrementer t(stats::cexTime);
 
   Assignment *a;
   if (!getAssignment(query.withFalse(), a))
@@ -480,7 +500,7 @@ CexCachingSolver::computeInitialValues(const Query& query,
                                        std::vector< std::vector<unsigned char> >
                                          &values,
                                        bool &hasSolution) {
-  TimerStatIncrementer t(stats::cexCacheTime);
+  TimerStatIncrementer t(stats::cexTime);
   Assignment *a;
   if (!getAssignment(query, a))
     return false;

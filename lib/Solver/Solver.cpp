@@ -799,7 +799,7 @@ STPSolverImpl::computeInitialValues(const Query &query,
                                     bool &hasSolution) {
   runStatusCode =  SOLVER_RUN_STATUS_FAILURE; 
     
-  TimerStatIncrementer t(stats::queryTime);
+  TimerStatIncrementer t(stats::smtTime);
 
   vc_push(vc);
 
