@@ -41,7 +41,7 @@ bool TimingSolver::evaluate(const ExecutionState& state, ref<Expr> expr,
 
   sys::Process::GetTimeUsage(delta,user,sys);
   delta -= now;
-  stats::solverTime += delta.usec();
+  stats::solverChainTime += delta.usec();
   state.queryCost += delta.usec()/1000000.;
 
   return success;
@@ -65,7 +65,7 @@ bool TimingSolver::mustBeTrue(const ExecutionState& state, ref<Expr> expr,
 
   sys::Process::GetTimeUsage(delta,user,sys);
   delta -= now;
-  stats::solverTime += delta.usec();
+  stats::solverChainTime += delta.usec();
   state.queryCost += delta.usec()/1000000.;
 
   return success;
@@ -112,7 +112,7 @@ bool TimingSolver::getValue(const ExecutionState& state, ref<Expr> expr,
 
   sys::Process::GetTimeUsage(delta,user,sys);
   delta -= now;
-  stats::solverTime += delta.usec();
+  stats::solverChainTime += delta.usec();
   state.queryCost += delta.usec()/1000000.;
 
   return success;
@@ -136,7 +136,7 @@ TimingSolver::getInitialValues(const ExecutionState& state,
   
   sys::Process::GetTimeUsage(delta,user,sys);
   delta -= now;
-  stats::solverTime += delta.usec();
+  stats::solverChainTime += delta.usec();
   state.queryCost += delta.usec()/1000000.;
   
   return success;

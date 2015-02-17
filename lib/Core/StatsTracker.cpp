@@ -389,9 +389,11 @@ void StatsTracker::writeStatsHeader() {
              << "'WallTime',"
              << "'CoveredInstructions',"
              << "'UncoveredInstructions',"
-             << "'QueryTime',"
-             << "'SolverTime',"
+             << "'SolverChainTime',"
+			 << "'CachingSolvingTime',"
+			 << "'IndependentSolverTime',"
              << "'CexCacheTime',"
+             << "'SMTTime',"
              << "'ForkTime',"
              << "'ResolveTime',"
 #ifdef DEBUG
@@ -423,9 +425,11 @@ void StatsTracker::writeStatsLine() {
              << "," << elapsed()
              << "," << stats::coveredInstructions
              << "," << stats::uncoveredInstructions
-             << "," << stats::queryTime / 1000000.
-             << "," << stats::solverTime / 1000000.
+             << "," << stats::solverChainTime / 1000000.
+             << "," << stats::cacheTime / 1000000.
+             << "," << stats::independentTime / 1000000.
              << "," << stats::cexCacheTime / 1000000.
+             << "," << stats::smtTime / 1000000.
              << "," << stats::forkTime / 1000000.
              << "," << stats::resolveTime / 1000000.
 #ifdef DEBUG

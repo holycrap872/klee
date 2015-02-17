@@ -11,18 +11,26 @@
 
 using namespace klee;
 
-Statistic stats::cexCacheTime("CexCacheTime", "CCtime");
+
 Statistic stats::queries("Queries", "Q");
 Statistic stats::queriesInvalid("QueriesInvalid", "Qiv");
 Statistic stats::queriesValid("QueriesValid", "Qv");
-Statistic stats::queryCacheHits("QueryCacheHits", "QChits") ;
-Statistic stats::queryCacheMisses("QueryCacheMisses", "QCmisses");
-Statistic stats::queryCexCacheHits("QueryCexCacheHits", "QCexHits") ;
-Statistic stats::queryCexCacheMisses("QueryCexCacheMisses", "QCexMisses");
-Statistic stats::queryConstructTime("QueryConstructTime", "QBtime") ;
+
+Statistic stats::independentTime("IndependentTime","ITime");
+
+Statistic stats::cacheHits("CacheHits", "CHits") ;
+Statistic stats::cacheMisses("CacheMisses", "CMisses");
+Statistic stats::cacheTime("CacheTime","CTime");
+
+Statistic stats::cexCacheHits("CexCacheHits", "CexHits");
+Statistic stats::cexCacheMisses("CexCacheMisses", "CexMisses");
+Statistic stats::cexCacheTime("CexCacheTime", "CexTime");
+
+Statistic stats::smtTime("SMTTime", "SMTTime");
+
+Statistic stats::queryConstructTime("QueryConstructTime", "QBTime") ;
 Statistic stats::queryConstructs("QueriesConstructs", "QB");
 Statistic stats::queryCounterexamples("QueriesCEX", "Qcex");
-Statistic stats::queryTime("QueryTime", "Qtime");
 
 #ifdef DEBUG
 Statistic stats::arrayHashTime("ArrayHashTime", "AHtime");

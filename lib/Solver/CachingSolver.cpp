@@ -14,6 +14,7 @@
 #include "klee/Expr.h"
 #include "klee/IncompleteSolver.h"
 #include "klee/SolverImpl.h"
+#include "klee/TimerStatIncrementer.h"
 
 #include "SolverStats.h"
 
@@ -80,14 +81,20 @@ public:
   bool computeValidity(const Query&, Solver::Validity &result);
   bool computeTruth(const Query&, bool &isValid);
   bool computeValue(const Query& query, ref<Expr> &result) {
-    ++stats::queryCacheMisses;
+
+	TimerStatIncrementer t(stats::cacheTime);
+
+    ++stats::cacheMisses;
     return solver->impl->computeValue(query, result);
   }
   bool computeInitialValues(const Query& query,
                             const std::vector<const Array*> &objects,
                             std::vector< std::vector<unsigned char> > &values,
                             bool &hasSolution) {
-    ++stats::queryCacheMisses;
+
+	TimerStatIncrementer t(stats::cacheTime);
+
+    ++stats::cacheMisses;
     return solver->impl->computeInitialValues(query, objects, values, 
                                               hasSolution);
   }
@@ -148,6 +155,9 @@ void CachingSolver::cacheInsert(const Query& query,
 
 bool CachingSolver::computeValidity(const Query& query,
                                     Solver::Validity &result) {
+
+  TimerStatIncrementer t(stats::cacheTime);
+
   IncompleteSolver::PartialValidity cachedResult;
   bool tmp, cacheHit = cacheLookup(query, cachedResult);
   
@@ -155,18 +165,18 @@ bool CachingSolver::computeValidity(const Query& query,
     switch(cachedResult) {
     case IncompleteSolver::MustBeTrue:   
       result = Solver::True;
-      ++stats::queryCacheHits;
+      ++stats::cacheHits;
       return true;
     case IncompleteSolver::MustBeFalse:  
       result = Solver::False;
-      ++stats::queryCacheHits;
+      ++stats::cacheHits;
       return true;
     case IncompleteSolver::TrueOrFalse:  
       result = Solver::Unknown;
-      ++stats::queryCacheHits;
+      ++stats::cacheHits;
       return true;
     case IncompleteSolver::MayBeTrue: {
-      ++stats::queryCacheMisses;
+      ++stats::cacheMisses;
       if (!solver->impl->computeTruth(query, tmp))
         return false;
       if (tmp) {
@@ -180,7 +190,7 @@ bool CachingSolver::computeValidity(const Query& query,
       }
     }
     case IncompleteSolver::MayBeFalse: {
-      ++stats::queryCacheMisses;
+      ++stats::cacheMisses;
       if (!solver->impl->computeTruth(query.negateExpr(), tmp))
         return false;
       if (tmp) {
@@ -197,7 +207,7 @@ bool CachingSolver::computeValidity(const Query& query,
     }
   }
 
-  ++stats::queryCacheMisses;
+  ++stats::cacheMisses;
   
   if (!solver->impl->computeValidity(query, result))
     return false;
@@ -217,18 +227,21 @@ bool CachingSolver::computeValidity(const Query& query,
 
 bool CachingSolver::computeTruth(const Query& query,
                                  bool &isValid) {
+
+  TimerStatIncrementer t(stats::cacheTime);
+
   IncompleteSolver::PartialValidity cachedResult;
   bool cacheHit = cacheLookup(query, cachedResult);
 
   // a cached result of MayBeTrue forces us to check whether
   // a False assignment exists.
   if (cacheHit && cachedResult != IncompleteSolver::MayBeTrue) {
-    ++stats::queryCacheHits;
+    ++stats::cacheHits;
     isValid = (cachedResult == IncompleteSolver::MustBeTrue);
     return true;
   }
 
-  ++stats::queryCacheMisses;
+  ++stats::cacheMisses;
   
   // cache miss: query solver
   if (!solver->impl->computeTruth(query, isValid))

@@ -13,11 +13,14 @@
 #include "klee/Expr.h"
 #include "klee/Constraints.h"
 #include "klee/SolverImpl.h"
+#include "klee/TimerStatIncrementer.h"
 #include "klee/Internal/Support/Debug.h"
 
 #include "klee/util/ExprUtil.h"
 #include "klee/util/Assignment.h"
 #include "klee/util/IndependenceAnalysis.h"
+
+#include "SolverStats.h"
 
 #include "llvm/Support/raw_ostream.h"
 #include <map>
@@ -52,6 +55,9 @@ public:
   
 bool IndependentSolver::computeValidity(const Query& query,
                                         Solver::Validity &result) {
+
+  TimerStatIncrementer t(stats::independentTime);
+
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure =
     getFreshFactor(query, required);
@@ -61,6 +67,9 @@ bool IndependentSolver::computeValidity(const Query& query,
 }
 
 bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
+
+  TimerStatIncrementer t(stats::independentTime);
+
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure = 
     getFreshFactor(query, required);
@@ -70,6 +79,9 @@ bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
 }
 
 bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
+
+  TimerStatIncrementer t(stats::independentTime);
+
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure = 
     getFreshFactor(query, required);
@@ -84,7 +96,6 @@ bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
 bool createdPointEvaluatesToTrue(const Query &query,
                const std::vector<const Array*> &objects,
                std::vector< std::vector<unsigned char> > &values){
-
        Assignment assign = Assignment(objects, values);
 
        for(ConstraintManager::constraint_iterator it = query.constraints.begin();
@@ -106,6 +117,8 @@ bool IndependentSolver::computeInitialValues(const Query& query,
 		const std::vector<const Array*> &objects,
 		std::vector< std::vector<unsigned char> > &values,
 		bool &hasSolution){
+
+	TimerStatIncrementer t(stats::independentTime);
 
 	std::list<IndependentElementSet> * factors = new std::list<IndependentElementSet>;
 	getAllFactors(query, factors);

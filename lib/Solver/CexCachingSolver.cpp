@@ -516,7 +516,7 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
     if (CE->isFalse()) {
       result = (Assignment*) 0;
       if(!skipStats){
-    	  ++stats::queryCexCacheHits;
+    	  ++stats::cexCacheHits;
       }
       return true;
     }
@@ -542,9 +542,9 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
 
   if(!skipStats){
 	  if (found){
-		  ++stats::queryCexCacheHits;
+		  ++stats::cexCacheHits;
 	  }else{
-		  ++stats::queryCexCacheMisses;
+		  ++stats::cexCacheMisses;
 	  }
   }
     
