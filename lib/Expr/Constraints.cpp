@@ -141,8 +141,8 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 					which = &rightBounded;
 				}else{
 					//9 < x
-					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->left);
-					value = oneTooBig->Add( ConstantExpr::alloc(1,Expr::Int32));
+					ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(ex->left);
+					value = oneTooSmall->Add( ConstantExpr::alloc(1,Expr::Int32));
 					which = & leftBounded;
 				}
 			}
@@ -167,8 +167,8 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 					which = &rightBounded;
 				}else{
 					//9 < x
-					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->left);
-					value = oneTooBig->Add( ConstantExpr::alloc(1,Expr::Int32));
+					ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(ex->left);
+					value = oneTooSmall->Add( ConstantExpr::alloc(1,Expr::Int32));
 					which = &leftBounded;
 				}
 			}
@@ -233,11 +233,11 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 			if(which->count(key) == 0){
 				which->insert(std::make_pair(key, value));
 			}else if(which == &leftBounded){
-				if(leftBounded[key]->compareContents(* value.get()) > 0){
+				if(leftBounded[key]->compareContents(* value.get()) < 0){
 					leftBounded.insert(std::make_pair(key, value));
 				}
 			}else{
-				if(rightBounded[key]->compareContents(* value.get()) < 0){
+				if(rightBounded[key]->compareContents(* value.get()) > 0){
 					rightBounded.insert(std::make_pair(key, value));
 				}
 			}
