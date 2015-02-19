@@ -93,31 +93,170 @@ void ConstraintManager::simplifyForValidConstraint(ref<Expr> e) {
 }
 
 ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
-  if (isa<ConstantExpr>(e))
-    return e;
+	if (isa<ConstantExpr>(e))
+		return e;
 
-  std::map< ref<Expr>, ref<Expr> > equalities;
-  
-  for (ConstraintManager::constraints_ty::const_iterator 
-         it = constraints.begin(), ie = constraints.end(); it != ie; ++it) {
-    if (const EqExpr *ee = dyn_cast<EqExpr>(*it)) {
-      if (isa<ConstantExpr>(ee->left)) {
-        equalities.insert(std::make_pair(ee->right,
-                                         ee->left));
-      } else {
-        equalities.insert(std::make_pair(*it,
-                                         ConstantExpr::alloc(1, Expr::Bool)));
-      }
-    } else {
-      equalities.insert(std::make_pair(*it,
-                                       ConstantExpr::alloc(1, Expr::Bool)));
-    }
-  }
+	std::map< ref<Expr>, ref<Expr> > equalities;
+	std::map< ref<Expr>, ref<ConstantExpr> > leftBounded; //3 < x or 4 <= 6
+	std::map< ref<Expr>, ref<ConstantExpr> > rightBounded; //x < 9 or x <= 17
 
-  return ExprReplaceVisitor2(equalities).visit(e);
+	for (ConstraintManager::constraints_ty::const_iterator
+			it = constraints.begin(), ie = constraints.end(); it != ie; ++it) {
+
+		bool topFalse = false;
+		ref<Expr> expr = *it;
+		if (const EqExpr *ee = dyn_cast<EqExpr>(expr)){
+			if(isa<ConstantExpr>(ee->left) && ! cast<ConstantExpr>(ee->left)->isFalse()) {
+				//if we have a simple expression like x == 6, then add that to the equality pair
+				equalities.insert(std::make_pair(ee->right, ee->left));
+				continue;
+			}else{
+				expr = ee->right;
+				topFalse = true;
+			}
+		}
+
+		//Eric's stuff .... ugly :(
+		std::map< ref<Expr>, ref<ConstantExpr> > * which = 0;
+		ref<Expr> key = 0;
+		ref<ConstantExpr> value = 0;
+		if(const UltExpr *ex = dyn_cast<UltExpr>(expr)){
+			if(isa<ConstantExpr>(ex->right)) {
+				key = ex->left;
+				if(topFalse){
+					//x >=10
+					value = dyn_cast<ConstantExpr>(ex->right);
+					which = &leftBounded;
+				}else{
+					//x < 10
+					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->right);
+					value = oneTooBig->Sub(ConstantExpr::alloc(1,Expr::Int32));
+					which = &rightBounded;
+				}
+			}else if(isa<ConstantExpr>(ex->left)){
+				key = ex->right;
+				if(topFalse){
+					//9 >= x
+					value = dyn_cast<ConstantExpr>(ex->left);
+					which = &rightBounded;
+				}else{
+					//9 < x
+					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->left);
+					value = oneTooBig->Add( ConstantExpr::alloc(1,Expr::Int32));
+					which = & leftBounded;
+				}
+			}
+		}else if(const SltExpr *ex = dyn_cast<SltExpr>(expr)){
+			if(isa<ConstantExpr>(ex->right)) {
+				key = ex->left;
+				if(topFalse){
+					//x >=10
+					value = dyn_cast<ConstantExpr>(ex->right);
+					which = &leftBounded;
+				}else{
+					//x < 10
+					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->right);
+					value = oneTooBig->Sub(ConstantExpr::alloc(1,Expr::Int32));
+					which = &rightBounded;
+				}
+			}else if(isa<ConstantExpr>(ex->left)){
+				key = ex->right;
+				if(topFalse){
+					//9 >= x
+					value = dyn_cast<ConstantExpr>(ex->left);
+					which = &rightBounded;
+				}else{
+					//9 < x
+					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->left);
+					value = oneTooBig->Add( ConstantExpr::alloc(1,Expr::Int32));
+					which = &leftBounded;
+				}
+			}
+		}else if(UleExpr *ex = dyn_cast<UleExpr>(expr)){
+			if(isa<ConstantExpr>(ex->right)) {
+				key = ex->left;
+				if(topFalse){
+					//x > 10
+					ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(ex->right);
+					value = oneTooSmall->Add(ConstantExpr::alloc(1,Expr::Int32));
+					which = &leftBounded;
+				}else{
+					//x <=10
+					value = dyn_cast<ConstantExpr>(ex->right);
+					which = &rightBounded;
+				}
+			}else if(isa<ConstantExpr>(ex->left)){
+				key = ex->right;
+				if(topFalse){
+					//10 > x
+					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->left);
+					value = oneTooBig->Sub(ConstantExpr::alloc(1,Expr::Int32));
+					which = &rightBounded;
+				}else{
+					//10 <=x
+					value = dyn_cast<ConstantExpr>(ex->left);
+					which = &leftBounded;
+				}
+			}
+		}else if(SleExpr *ex = dyn_cast<SleExpr>(expr)){
+			if(isa<ConstantExpr>(ex->right)) {
+				key = ex->left;
+				if(topFalse){
+					//x > 10
+					ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(ex->right);
+					value = oneTooSmall->Add(ConstantExpr::alloc(1,Expr::Int32));
+					which = &leftBounded;
+				}else{
+					//x <=10
+					value = dyn_cast<ConstantExpr>(ex->right);
+					which = &rightBounded;
+				}
+			}else if(isa<ConstantExpr>(ex->left)){
+				key = ex->right;
+				if(topFalse){
+					//10 > x
+					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->left);
+					value = oneTooBig->Sub(ConstantExpr::alloc(1,Expr::Int32));
+					which = &rightBounded;
+				}else{
+					//10 <=x
+					value = dyn_cast<ConstantExpr>(ex->left);
+					which = &leftBounded;
+				}
+			}
+		}
+
+		equalities.insert(std::make_pair(*it, ConstantExpr::alloc(1, Expr::Bool)));
+
+		if(which != 0){
+			assert(value.get() != 0 && key.get() != 0);
+			if(which->count(key) == 0){
+				which->insert(std::make_pair(key, value));
+			}else if(which == &leftBounded){
+				if(leftBounded[key]->compareContents(* value.get()) > 0){
+					leftBounded.insert(std::make_pair(key, value));
+				}
+			}else{
+				if(rightBounded[key]->compareContents(* value.get()) < 0){
+					rightBounded.insert(std::make_pair(key, value));
+				}
+			}
+		}else{
+			assert(key.get() == 0 && value.get() == 0);
+		}
+	}
+
+	for(std::map<ref<Expr>, ref<ConstantExpr> >::iterator it = leftBounded.begin(); it != leftBounded.end(); it++){
+		ref<Expr> key = it->first;
+		if(rightBounded.count(key) && leftBounded[key]->compareContents(*rightBounded[key]) == 0){
+			equalities.insert(std::make_pair(key, leftBounded[key]));
+		}
+	}
+
+	return ExprReplaceVisitor2(equalities).visit(e);
 }
 
-void ConstraintManager::addConstraintInternal(ref<Expr> e) {
+	void ConstraintManager::addConstraintInternal(ref<Expr> e) {
   // rewrite any known equalities 
 
   // XXX should profile the effects of this and the overhead.
