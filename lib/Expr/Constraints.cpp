@@ -130,7 +130,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				}else{
 					//x < 10
 					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->right);
-					value = oneTooBig->Sub(ConstantExpr::alloc(1,Expr::Int32));
+					value = oneTooBig->Sub(ConstantExpr::alloc(1,oneTooBig->getWidth()));
 					which = &rightBounded;
 				}
 			}else if(isa<ConstantExpr>(ex->left)){
@@ -142,7 +142,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				}else{
 					//9 < x
 					ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(ex->left);
-					value = oneTooSmall->Add( ConstantExpr::alloc(1,Expr::Int32));
+					value = oneTooSmall->Add( ConstantExpr::alloc(1,oneTooSmall->getWidth()));
 					which = & leftBounded;
 				}
 			}
@@ -156,7 +156,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				}else{
 					//x < 10
 					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->right);
-					value = oneTooBig->Sub(ConstantExpr::alloc(1,Expr::Int32));
+					value = oneTooBig->Sub(ConstantExpr::alloc(1,oneTooBig->getWidth()));
 					which = &rightBounded;
 				}
 			}else if(isa<ConstantExpr>(ex->left)){
@@ -168,7 +168,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				}else{
 					//9 < x
 					ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(ex->left);
-					value = oneTooSmall->Add( ConstantExpr::alloc(1,Expr::Int32));
+					value = oneTooSmall->Add( ConstantExpr::alloc(1,oneTooSmall->getWidth()));
 					which = &leftBounded;
 				}
 			}
@@ -178,7 +178,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				if(topFalse){
 					//x > 10
 					ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(ex->right);
-					value = oneTooSmall->Add(ConstantExpr::alloc(1,Expr::Int32));
+					value = oneTooSmall->Add(ConstantExpr::alloc(1,oneTooSmall->getWidth()));
 					which = &leftBounded;
 				}else{
 					//x <=10
@@ -190,7 +190,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				if(topFalse){
 					//10 > x
 					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->left);
-					value = oneTooBig->Sub(ConstantExpr::alloc(1,Expr::Int32));
+					value = oneTooBig->Sub(ConstantExpr::alloc(1,oneTooBig->getWidth()));
 					which = &rightBounded;
 				}else{
 					//10 <=x
@@ -204,7 +204,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				if(topFalse){
 					//x > 10
 					ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(ex->right);
-					value = oneTooSmall->Add(ConstantExpr::alloc(1,Expr::Int32));
+					value = oneTooSmall->Add(ConstantExpr::alloc(1,oneTooSmall->getWidth()));
 					which = &leftBounded;
 				}else{
 					//x <=10
@@ -216,7 +216,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				if(topFalse){
 					//10 > x
 					ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(ex->left);
-					value = oneTooBig->Sub(ConstantExpr::alloc(1,Expr::Int32));
+					value = oneTooBig->Sub(ConstantExpr::alloc(1,oneTooBig->getWidth()));
 					which = &rightBounded;
 				}else{
 					//10 <=x
@@ -234,11 +234,11 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 				which->insert(std::make_pair(key, value));
 			}else if(which == &leftBounded){
 				if(leftBounded[key]->compareContents(* value.get()) < 0){
-					leftBounded.insert(std::make_pair(key, value));
+					leftBounded[key] = value;
 				}
 			}else{
 				if(rightBounded[key]->compareContents(* value.get()) > 0){
-					rightBounded.insert(std::make_pair(key, value));
+					rightBounded[key] = value;
 				}
 			}
 		}else{
