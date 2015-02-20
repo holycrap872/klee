@@ -396,6 +396,8 @@ void StatsTracker::writeStatsHeader() {
              << "'SMTTime',"
              << "'ForkTime',"
              << "'ResolveTime',"
+			 << "'CexCacheHits',"
+			 << "'CexCacheMisses',"
 #ifdef DEBUG
 	     << "'ArrayHashTime',"
 #endif
@@ -432,6 +434,8 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::smtTime / 1000000.
              << "," << stats::forkTime / 1000000.
              << "," << stats::resolveTime / 1000000.
+			 << "," << stats::cexCacheHits
+			 << "," << stats::cexCacheMisses
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
