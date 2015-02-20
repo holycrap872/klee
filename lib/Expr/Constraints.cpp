@@ -21,6 +21,8 @@
 
 #include <map>
 
+#include <iostream>
+
 using namespace klee;
 
 class ExprReplaceVisitor : public ExprVisitor {
@@ -268,6 +270,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 		ref<Expr> key = it->first;
 		if(rightBounded.count(key) && leftBounded[key]->compareContents(*rightBounded[key]) == 0){
 			equalities.insert(std::make_pair(key, leftBounded[key]));
+			std::cout << "We narrowed it down to a single concrete value\n";
 		}
 	}
 
