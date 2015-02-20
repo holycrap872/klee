@@ -105,7 +105,8 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 
 		bool topFalse = false;
 		ref<Expr> expr = *it;
-		if (const EqExpr *ee = dyn_cast<EqExpr>(expr)){
+		if (expr->getKind() == Expr::Eq){
+			const EqExpr *ee = dyn_cast<EqExpr>(expr);
 			if(isa<ConstantExpr>(ee->left) && ! cast<ConstantExpr>(ee->left)->isFalse()) {
 				//if we have a simple expression like x == 6, then add that to the equality pair
 				equalities.insert(std::make_pair(ee->right, ee->left));
@@ -120,7 +121,10 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 		std::map< ref<Expr>, ref<ConstantExpr> > * which = 0;
 		ref<Expr> key = 0;
 		ref<ConstantExpr> value = 0;
-		if(const UltExpr *ex = dyn_cast<UltExpr>(expr)){
+
+		switch (expr->getKind()){
+		case Expr::Ult:{
+			const UltExpr *ex = dyn_cast<UltExpr>(expr);
 			if(isa<ConstantExpr>(ex->right)) {
 				key = ex->left;
 				if(topFalse){
@@ -146,7 +150,10 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 					which = & leftBounded;
 				}
 			}
-		}else if(const SltExpr *ex = dyn_cast<SltExpr>(expr)){
+		} break;
+
+		case Expr::Slt :{
+			const SltExpr *ex = dyn_cast<SltExpr>(expr);
 			if(isa<ConstantExpr>(ex->right)) {
 				key = ex->left;
 				if(topFalse){
@@ -172,7 +179,10 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 					which = &leftBounded;
 				}
 			}
-		}else if(UleExpr *ex = dyn_cast<UleExpr>(expr)){
+		} break;
+
+		case Expr::Ule : {
+			const UleExpr *ex = dyn_cast<UleExpr>(expr);
 			if(isa<ConstantExpr>(ex->right)) {
 				key = ex->left;
 				if(topFalse){
@@ -198,7 +208,10 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 					which = &leftBounded;
 				}
 			}
-		}else if(SleExpr *ex = dyn_cast<SleExpr>(expr)){
+		}break;
+
+		case Expr::Sle : {
+			const SleExpr *ex = dyn_cast<SleExpr>(expr);
 			if(isa<ConstantExpr>(ex->right)) {
 				key = ex->left;
 				if(topFalse){
@@ -224,6 +237,11 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 					which = &leftBounded;
 				}
 			}
+		}break;
+
+		default: {
+
+		} break;
 		}
 
 		equalities.insert(std::make_pair(*it, ConstantExpr::alloc(1, Expr::Bool)));
