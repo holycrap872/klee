@@ -141,7 +141,8 @@ namespace {
  
   cl::opt<bool>
   NoPreferCex("no-prefer-cex",
-              cl::init(false));
+              cl::init(false),
+  	  	  	  cl::desc("Make test cases human-readable/command-line-possible when able (ASCII < 127) (default=on)"));
  
   cl::opt<bool>
   RandomizeFork("randomize-fork",
