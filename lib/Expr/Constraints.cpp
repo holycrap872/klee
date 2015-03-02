@@ -94,6 +94,10 @@ void ConstraintManager::simplifyForValidConstraint(ref<Expr> e) {
   // XXX 
 }
 
+ref<Expr> ConstraintManager::superSimplifyExpr(ref<Expr> e) const{
+
+}
+
 ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
 	if (isa<ConstantExpr>(e))
 		return e;
