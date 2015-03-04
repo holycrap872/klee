@@ -113,6 +113,9 @@ class CexCachingSolver : public SolverImpl {
   void insertInQuickCache(const KeyType & key, Assignment * &binding);
   void insertInCaches(const KeyType & key, Assignment * &binding);
 
+  bool checkPreviousSolutionHelper(const ref<Expr>, const std::set<ref<Expr> > &key, Assignment * &result);
+  bool checkPreviousSolution(const Query &query, Assignment *&result);
+
   bool getAssignment(const Query& query, Assignment *&result);
   
 public:
@@ -237,6 +240,75 @@ CexCachingSolver::insertInCaches(const KeyType &key, Assignment * &binding){
   cache.insert(key, binding);
 }
 
+bool
+CexCachingSolver::checkPreviousSolutionHelper(const ref<Expr> queryExpr,
+                                              const std::set<ref<Expr> > &key,
+                                              Assignment * &result){
+  Assignment * parentSolution = 0;
+  if (getFromQuickCache(key, parentSolution)){
+    if (!parentSolution){
+      // Means that the the previous state was UNSAT and therefore the
+      // new answer will also necessarily be UNSAT (Subsumes UNSAT)
+      result = 0;
+      return true;
+    } else {
+      // Means that there is in fact a parent solution.  In this case,
+      // we can now check whether this parent solution satisfies the
+      // child state.  There's a pretty good chance... at least 50/50
+      ref<Expr> neg = Expr::createIsZero(queryExpr);
+      ref<Expr> q = parentSolution->evaluate(neg);
+
+      assert(isa<ConstantExpr>(q) && "assignment evaluation did not result in constant");
+      if (cast<ConstantExpr>(q)->isTrue()){
+        result = parentSolution;
+        return true;
+      } else {
+        // If goes false, that means that the point that had gotten us to our parent
+        // went along the opposing branch and it won't help us at this stage.
+        return false;
+      }
+    }
+  }
+  assert(!parentSolution);
+  return false;
+}
+
+bool
+CexCachingSolver::checkPreviousSolution(const Query &query, Assignment * &result){
+  if (query.constraints.size() == 0){
+    return false;
+  }
+
+  std::set<ref<Expr> > parentKey;
+  ref<Expr> queryExpr;
+  if (isa<ConstantExpr>(query.expr)){
+    assert(cast<ConstantExpr>(query.expr)->isFalse() && "query.expr == true should'd happen");
+    for (unsigned i = 0; i < query.constraints.size() - 1; i ++){
+      ref<Expr> ref = query.constraints.get(i);
+      parentKey.insert(ref);
+    }
+
+    ref<Expr> toNeg = query.constraints.get(query.constraints.size() - 1);
+    queryExpr = Expr::createIsZero(toNeg);
+  } else {
+    for (unsigned i = 0; i < query.constraints.size(); i ++){
+      ref<Expr> ref = query.constraints.get(i);
+      parentKey.insert(ref);
+    }
+    queryExpr = query.expr;
+  }
+
+  if (checkPreviousSolutionHelper(queryExpr, parentKey, result)){
+    // result may contain one of two things
+    //  - A 0, meaning that the previous piece of the was UNSAT and therefore new is too
+    //  - An actual result which we should verify is correct.
+    return true;
+  } else {
+    return false;
+  }
+}
+
+
 /// lookupAssignment - Lookup a cached result for the given \arg query.
 ///
 /// \param query - The query to lookup.
@@ -260,6 +332,13 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
   }
 
   bool found = getFromQuickCache(key, result);
+
+  if (!found){
+    found = checkPreviousSolution(query, result);
+    if (found){
+      insertInQuickCache(key, result);
+    }
+  }
 
   if (!found){
     found = searchForAssignment(key, result);
