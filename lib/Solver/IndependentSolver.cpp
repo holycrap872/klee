@@ -436,7 +436,6 @@ bool IndependentSolver::computeInitialValues(const Query& query,
                                              const std::vector<const Array*> &objects,
                                              std::vector< std::vector<unsigned char> > &values,
                                              bool &hasSolution){
-  TimerStatIncrementer t(stats::independentTime);
   if(!IndySplitSolution) {
     return solver->impl->computeInitialValues(query, objects, values, hasSolution);
   }
