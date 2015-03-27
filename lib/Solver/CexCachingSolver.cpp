@@ -46,6 +46,15 @@ namespace {
   cl::opt<bool>
   CexCacheExperimental("cex-cache-exp", cl::init(false));
 
+  cl::opt<bool>
+  CexQuickCache("quick-cache",
+                cl::desc("Enable the QuickCache optimization in CexCachingSolver (default=on)"),
+                cl::init(true));
+
+  cl::opt<bool>
+  CexPrevSolution("prev-solution",
+                  cl::desc("Enable the Previous Solution optimization in CexCachingSolver (default=on)"),
+                  cl::init(true));
 }
 
 ///
@@ -331,9 +340,12 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
     key.insert(neg);
   }
 
-  bool found = getFromQuickCache(key, result);
+  bool found = false;
+  if(!found && CexQuickCache) {
+    found = getFromQuickCache(key, result);
+  }
 
-  if (!found){
+  if (!found && CexPrevSolution){
     found = checkPreviousSolution(query, result);
     if (found){
       insertInQuickCache(key, result);

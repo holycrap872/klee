@@ -16,6 +16,9 @@
 #include "klee/util/ExprUtil.h"
 #include "klee/util/Assignment.h"
 
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
+
 #include <map>
 #include <vector>
 #include <ostream>
@@ -24,6 +27,14 @@
 
 using namespace klee;
 using namespace llvm;
+
+namespace {
+  cl::opt<bool>
+  IndySplitSolution("split-solution",
+                     cl::desc("Enable the Split Solutions optimization in IndependentSolver (default=on)"),
+                     cl::init(true));
+}
+
 
 template<class T>
 class DenseSet {
@@ -425,6 +436,10 @@ bool IndependentSolver::computeInitialValues(const Query& query,
                                              const std::vector<const Array*> &objects,
                                              std::vector< std::vector<unsigned char> > &values,
                                              bool &hasSolution){
+  TimerStatIncrementer t(stats::independentTime);
+  if(!IndySplitSolution) {
+    return solver->impl->computeInitialValues(query, objects, values, hasSolution);
+  }
   std::list<IndependentElementSet> * factors = new std::list<IndependentElementSet>;
   getAllIndependentConstraintsSets(query, factors);
   //Used to rearrange all of the answers into the correct order
