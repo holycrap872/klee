@@ -55,6 +55,11 @@ namespace {
   CexPrevSolution("prev-solution",
                   cl::desc("Enable the Previous Solution optimization in CexCachingSolver (default=on)"),
                   cl::init(true));
+
+  cl::opt<bool>
+  CexDisableSuperSet("disable-super-set",
+                     cl::desc("Disable the CexCachingSolver check for super set solutions (default=on)"),
+                     cl::init(true));
 }
 
 ///
@@ -211,7 +216,7 @@ bool CexCachingSolver::searchForAssignment(KeyType &key, Assignment *&result) {
     // Look for a satisfying assignment for a superset, which is trivially an
     // assignment for any subset.
     Assignment **lookup = 0;
-    if(!lookup) {
+    if(!lookup && !CexDisableSuperSet) {
       TimerStatIncrementer tSuper(stats::cexUBSuperTime);
       lookup = cache.findSuperset(key, NonNullAssignment());
       if(lookup) {
