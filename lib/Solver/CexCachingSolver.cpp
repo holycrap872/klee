@@ -128,7 +128,11 @@ class CexCachingSolver : public SolverImpl {
   void insertInQuickCache(const KeyType & key, Assignment * &binding);
   void insertInCaches(const KeyType & key, Assignment * &binding);
 
-  bool checkPreviousSolutionHelper(const ref<Expr>, const std::set<ref<Expr> > &key, Assignment * &result);
+  bool checkPreviousSolutionHelper(const ref<Expr>,
+                                   const std::set<ref<Expr> > &key,
+                                   Assignment * &parentSolution,
+                                   Assignment * &result);
+
   bool checkPreviousSolution(const Query &query, Assignment *&result);
 
   bool guessIndependent(const Query& query,
@@ -280,8 +284,8 @@ CexCachingSolver::insertInCaches(const KeyType &key, Assignment * &binding){
 bool
 CexCachingSolver::checkPreviousSolutionHelper(const ref<Expr> queryExpr,
                                               const std::set<ref<Expr> > &key,
+                                              Assignment * &parentSolution,
                                               Assignment * &result){
-  Assignment * parentSolution = 0;
   if (getFromQuickCache(key, parentSolution)){
     if (!parentSolution){
       // Means that the the previous state was UNSAT and therefore the
@@ -302,6 +306,7 @@ CexCachingSolver::checkPreviousSolutionHelper(const ref<Expr> queryExpr,
       } else {
         // If goes false, that means that the point that had gotten us to our parent
         // went along the opposing branch and it won't help us at this stage.
+        assert(parentSolution);
         return false;
       }
     }
@@ -335,13 +340,16 @@ CexCachingSolver::checkPreviousSolution(const Query &query, Assignment * &result
     queryExpr = query.expr;
   }
 
-  if (checkPreviousSolutionHelper(queryExpr, parentKey, result)){
+  Assignment * parentSolution = 0;
+  if (checkPreviousSolutionHelper(queryExpr, parentKey, parentSolution, result)){
     // result may contain one of two things
     //  - A 0, meaning that the previous piece of the was UNSAT and therefore new is too
     //  - An actual result which we should verify is correct.
     return true;
-  } else {
+  } else if(!parentSolution){
     return false;
+  }else{
+    return guessIndependent(query, parentSolution, result);
   }
 }
 
