@@ -459,7 +459,7 @@ void StatsTracker::writeStatsLine() {
              << ")," << stats::cexHits
              << "," << stats::cexMisses
 #ifdef DEBUG
-             << "," << stats::arrayHashTime / 1000000.
+//             << "," << stats::arrayHashTime / 1000000.
 #endif
              << ")\n";
   statsFile->flush();
