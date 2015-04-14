@@ -16,6 +16,7 @@
 #include "klee/util/Assignment.h"
 #include "klee/util/ExprUtil.h"
 #include "klee/util/ExprVisitor.h"
+#include "klee/util/IndependenceAnalysis.h"
 #include "klee/Internal/ADT/MapOfSets.h"
 
 #include "SolverStats.h"
@@ -129,6 +130,10 @@ class CexCachingSolver : public SolverImpl {
 
   bool checkPreviousSolutionHelper(const ref<Expr>, const std::set<ref<Expr> > &key, Assignment * &result);
   bool checkPreviousSolution(const Query &query, Assignment *&result);
+
+  bool guessIndependent(const Query& query,
+                        Assignment *parentSolution,
+                        Assignment *&result);
 
   bool getAssignment(const Query& query, Assignment *&result);
   
@@ -340,6 +345,85 @@ CexCachingSolver::checkPreviousSolution(const Query &query, Assignment * &result
   }
 }
 
+bool CexCachingSolver::guessIndependent(const Query& query,
+                                        Assignment *parentSolution,
+                                        Assignment * &result){
+
+  /*
+   * At this point we know that the point going through the state
+   * prior to us is NOT helpful.  That means that it must go down
+   * the opposite branch.  What this means is that we were close,
+   * but no cigar.
+   *
+   * What I would like to do, therefore, is get all of the constraints
+   * DIRECTLY associated with the newest constraint.  I would then
+   * look in the cache for a result for the DIRECT piece.  I would
+   * then overwrite the indices of the previous state's solution with
+   * the answers for the DIRECT piece.
+   *
+   * Final note: it seems likely I will need to fill the quickCache
+   * much more carefully.  Perhaps things like using a renamer and
+   * pulling apart a solution every which way to increase chances of
+   * future hits.  For example (x > 1) && (x < 15) -> (x==5) would
+   * result in quickCache[x>1] = (x==5) and quickCache[x<15] = (x==5)
+   *
+   * OVERALL IDEA:
+   * 1) Get expression that is new
+   *    - If it is something like arr[x], then just RETURN FALSE
+   * 2) Get all expressions DIRECTLY associated with new expression
+   *    - Use the same setup as in IndependentSolver
+   * 3) See if this small piece exists
+   *    - If it doesn't, then just RETURN FALSE
+   * 4) Get the two results associated with each
+   *    - For each piece of the DIRECTLY associated expressions,
+   *      overwrite the big result
+   * 5) See if it works
+   *    - If works, then resultNoTouch = newResult, and RETURN TRUE
+   *    - If doesn't, then just RETURN FALSE.
+   */
+
+  //TODO
+  //if(newExpr contains arr[x]) return false;
+
+  std::vector<ref<Expr> > unsafeFactor;
+  IndependentElementSet ies = getIndependentConstraintsUnsafe(query, unsafeFactor);
+
+  //TODO: I think this check needs to be improved
+  if(unsafeFactor.size() == query.constraints.size() || ies.elements.size() == 0){
+    return false;
+  }
+
+  Assignment * newestAssignment = 0;
+  ConstraintManager tmp(unsafeFactor);
+  Query optimisticQuery = Query(tmp,  query.expr);
+
+  // Recursively call get assignment at the unsafe factor the of the larger
+  // constraint.  This factor will only contain elements directly related to
+  // the fresh part of the constraints. We insert true into the optional
+  // skipStats part in order to avoid having this recursive "helper" call
+  // messing up the stats of the actual process.
+  if(!getAssignment(optimisticQuery, newestAssignment)){
+    return false;
+  }else if(!newestAssignment){
+    // means the solution is impossible, and therefore the entire constraint
+    // is impossible! (see lookupAssignment docs)
+    result = 0;
+    return true;
+  }else{
+    result = new Assignment(*parentSolution, *newestAssignment, ies);
+    ref<Expr> neg = Expr::createIsZero(query.expr);
+    ref<Expr> q = result->evaluate(neg);
+
+    assert(isa<ConstantExpr>(q) && "assignment evaluation did not result in constant");
+    if(cast<ConstantExpr>(q)->isTrue()  && result->satisfies(query.constraints.begin(), query.constraints.end())){
+      return true;
+    }else{
+      delete result;
+      return false;
+    }
+  return false;
+  }
+}
 
 /// lookupAssignment - Lookup a cached result for the given \arg query.
 ///
