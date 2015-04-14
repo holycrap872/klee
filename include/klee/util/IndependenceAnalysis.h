@@ -128,6 +128,17 @@ public:
   // more efficient when this is the smaller set
   bool intersects(const IndependentElementSet &b);
 
+  // Assumes an independence between elements that are not directly
+  // referenced in the same constraint.  This means that symbolic
+  // accesses to an array do not cause a "collapse" so that any other
+  // reference to that same array, be it symbolic or concrete, is
+  // lumped into the same constraint.  While this is an unsafe operation,
+  // tests have shown that a highly effective "guess" solution can be
+  // synthesized and tested on the full set of constraints.  If it is a
+  // hit, then a SMT call has been avoided.  If it is not, the overall cost
+  // of generation and checking is very low so it was worth a shot.
+  bool intersectsUnsafe(const IndependentElementSet &b);
+
   // returns true iff set is changed by addition
   bool add(const IndependentElementSet &b);
 };
@@ -145,6 +156,9 @@ void getAllIndependentConstraintsSets(const Query& query,
 
 IndependentElementSet getIndependentConstraints(const Query& query,
                                                 std::vector< ref<Expr> > &result);
+
+IndependentElementSet getIndependentConstraintsUnsafe(const Query& query,
+                                                      std::vector< ref<Expr> > &result);
 
 // Extracts which arrays are referenced from a particular independent set.  Examines both
 // the actual known array accesses arr[1] plus the undetermined accesses arr[x].

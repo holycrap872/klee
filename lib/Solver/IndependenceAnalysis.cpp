@@ -104,6 +104,20 @@ bool IndependentElementSet::intersects(const IndependentElementSet &b) {
   return false;
 }
 
+bool IndependentElementSet::intersectsUnsafe(const IndependentElementSet &b) {
+  for (elements_ty::iterator it = elements.begin(), ie = elements.end();
+      it != ie; ++it) {
+    const Array *array = it->first;
+    elements_ty::const_iterator it2 = b.elements.find(array);
+    if (it2 != b.elements.end()) {
+      if (it->second.intersects(it2->second)){
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 bool IndependentElementSet::add(const IndependentElementSet &b) {
   for(unsigned i = 0; i < b.exprs.size(); i ++){
     ref<Expr> expr = b.exprs[i];
@@ -239,6 +253,39 @@ IndependentElementSet getIndependentConstraints(const Query& query,
     }
     errs() << "elts closure: " << eltsClosure << "\n";
  );
+
+  return eltsClosure;
+}
+
+IndependentElementSet getIndependentConstraintsUnsafe(const Query& query,
+                                                      std::vector< ref<Expr> > &result) {
+  IndependentElementSet eltsClosure(query.expr); //The new thing we're testing
+  std::vector< std::pair<ref<Expr>, IndependentElementSet> > worklist;
+
+  for (ConstraintManager::const_iterator it = query.constraints.begin(),
+       ie = query.constraints.end(); it != ie; ++it)
+      worklist.push_back(std::make_pair(*it, IndependentElementSet(*it)));
+
+  // XXX This should be more efficient (in terms of low level copy stuff).
+  bool done = false;
+  do {
+    done = true;
+    //The pair below keeps track of <Expr, Set<Variables in Expression>>
+    std::vector< std::pair<ref<Expr>, IndependentElementSet> > newWorklist;
+    for (std::vector< std::pair<ref<Expr>, IndependentElementSet> >::iterator
+         it = worklist.begin(), ie = worklist.end(); it != ie; ++it) {
+      IndependentElementSet next = it->second;
+      if (next.intersectsUnsafe(eltsClosure)) {
+        if (eltsClosure.add(next))
+          done = false; //Means that we have added (z=y)added to (x=y)
+        //Now need to see if there are any (z=?)'s
+        result.push_back(it->first);
+      } else {
+        newWorklist.push_back(*it);
+      }
+    }
+    worklist.swap(newWorklist);
+  } while (!done);
 
   return eltsClosure;
 }
