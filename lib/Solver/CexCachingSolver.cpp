@@ -61,6 +61,12 @@ namespace {
   CexDisableSuperSet("disable-super-set",
                      cl::desc("Disable the CexCachingSolver check for super set solutions (default=on)"),
                      cl::init(true));
+
+  cl::opt<bool>
+  CexSmashingSolver("smashing-solver",
+                    cl::desc("Assume new piece is independent from old piece and see consequences (default=0)\n"
+                    "Note: Dependendent on use-previous-solution=1"),
+                    cl::init(false));
 }
 
 ///
@@ -116,11 +122,11 @@ class CexCachingSolver : public SolverImpl {
   bool searchForAssignment(KeyType &key, 
                            Assignment *&result);
   
-  bool lookupAssignment(const Query& query, KeyType &key, Assignment *&result);
+  bool lookupAssignment(const Query& query, KeyType &key, Assignment *&result, const bool skipStats);
 
   bool lookupAssignment(const Query& query, Assignment *&result) {
     KeyType key;
-    return lookupAssignment(query, key, result);
+    return lookupAssignment(query, key, result, false);
   }
 
   // Caching operations
@@ -139,7 +145,7 @@ class CexCachingSolver : public SolverImpl {
                         Assignment *parentSolution,
                         Assignment *&result);
 
-  bool getAssignment(const Query& query, Assignment *&result);
+  bool getAssignment(const Query& query, Assignment *&result, const bool skipStats = false);
   
 public:
   CexCachingSolver(Solver *_solver) : solver(_solver) {}
@@ -346,7 +352,7 @@ CexCachingSolver::checkPreviousSolution(const Query &query, Assignment * &result
     //  - A 0, meaning that the previous piece of the was UNSAT and therefore new is too
     //  - An actual result which we should verify is correct.
     return true;
-  } else if(!parentSolution){
+  } else if(!parentSolution || !CexSmashingSolver){
     return false;
   }else{
     return guessIndependent(query, parentSolution, result);
@@ -410,7 +416,7 @@ bool CexCachingSolver::guessIndependent(const Query& query,
   // the fresh part of the constraints. We insert true into the optional
   // skipStats part in order to avoid having this recursive "helper" call
   // messing up the stats of the actual process.
-  if(!getAssignment(optimisticQuery, newestAssignment)){
+  if(!getAssignment(optimisticQuery, newestAssignment, true)){
     return false;
   }else if(!newestAssignment){
     // means the solution is impossible, and therefore the entire constraint
@@ -443,13 +449,16 @@ bool CexCachingSolver::guessIndependent(const Query& query,
 /// \return True if a cached result was found.
 bool CexCachingSolver::lookupAssignment(const Query &query, 
                                         KeyType &key,
-                                        Assignment *&result) {
+                                        Assignment *&result,
+                                        const bool skipStats) {
   key = KeyType(query.constraints.begin(), query.constraints.end());
   ref<Expr> neg = Expr::createIsZero(query.expr);
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(neg)) {
     if (CE->isFalse()) {
       result = (Assignment*) 0;
-      ++stats::cexHits;
+      if(!skipStats){
+        ++stats::cexHits;
+      }
       return true;
     }
   } else {
@@ -459,14 +468,14 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
   bool found = false;
   if(!found && CexQuickCache) {
     found = getFromQuickCache(key, result);
-    if(found){
+    if(found && !skipStats){
       ++stats::cexQuickHits;
     }
   }
 
-  if (!found && CexPrevSolution){
+  if (!found && !skipStats && CexPrevSolution){
     found = checkPreviousSolution(query, result);
-    if (found){
+    if (found && !skipStats){
       ++stats::cexPrevHits;
       insertInQuickCache(key, result);
     }
@@ -474,23 +483,24 @@ bool CexCachingSolver::lookupAssignment(const Query &query,
 
   if (!found){
     found = searchForAssignment(key, result);
-    if (found){
+    if (found && !skipStats){
       ++stats::cexUBHits;
       insertInQuickCache(key, result);
     }
   }
 
-  if (found)
-    ++stats::cexHits;
-  else
-    ++stats::cexMisses;
-    
+  if(!skipStats){
+    if (found)
+      ++stats::cexHits;
+    else
+      ++stats::cexMisses;
+  }
   return found;
 }
 
-bool CexCachingSolver::getAssignment(const Query& query, Assignment *&result) {
+bool CexCachingSolver::getAssignment(const Query& query, Assignment *&result, bool skipStats) {
   KeyType key;
-  if (lookupAssignment(query, key, result))
+  if (lookupAssignment(query, key, result, skipStats))
     return true;
 
   std::vector<const Array*> objects;
