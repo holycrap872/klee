@@ -23,6 +23,13 @@
 
 using namespace klee;
 
+namespace {
+  llvm::cl::opt<bool>
+  SimplifyInequalities("simplify-inequalities",
+                           llvm::cl::desc("Check to see if inequalities reduce the range of a variable to the point it can be concretized (default=on"),
+                           llvm::cl::init(true));
+}
+
 class ExprReplaceVisitor : public ExprVisitor {
 private:
   ref<Expr> src, dst;
@@ -177,7 +184,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
                                        ConstantExpr::alloc(1, Expr::Bool)));
     }
 
-    if (isa<CmpExpr>(expr)) {
+    if (SimplifyInequalities && isa<CmpExpr>(expr)) {
       // Find inequalities that constrain a variable to a specific range. The hope
       // is to find two constraints such as (x > 5) and (x < 7) that force a
       // variable to become a concrete value (x = 6). This transformation to an
