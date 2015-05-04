@@ -134,7 +134,9 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
   // that a variable's range could possibly be. Should the left and right
   // bounds be constrained to a single value, then we will be able to
   // concretize the variable leading to what is hopefully a useful
-  // simplification.
+  // simplification.  These maps keep track of the unsigned values of
+  // variables only.  This means that signed values have to be mapped into
+  // unsigned space.
   std::map< ref<Expr>, ref<ConstantExpr> > leftBounded; //3 < x or 4 <= 6
   std::map< ref<Expr>, ref<ConstantExpr> > rightBounded; //x < 9 or x <= 17
   
@@ -217,7 +219,9 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
         left = ex->left;
         right = ex->right;
       }
+
       ref<ConstantExpr> constantValue = 0;
+      ref<ConstantExpr> zero = ConstantExpr::alloc(0, left->getWidth());
       if (kind == Expr::Ult || kind == Expr::Slt) {
         if (isa<ConstantExpr>(right)) {
           // ex. (x < 10). Another way of saying this is x <= 0. We therefore
@@ -225,23 +229,51 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
           // easier to work with
           ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(right);
           constantValue = oneTooBig->Sub(ConstantExpr::alloc(1,oneTooBig->getWidth()));
-          if (kind == Expr::Slt &&
-              oneTooBig->getAPValue().slt(constantValue->getAPValue())) {
-            assert(false && "Overflow should not happen in this instance");
+          if (kind == Expr::Slt) {
+            if (oneTooBig->getAPValue().slt(constantValue->getAPValue())){
+              assert(false && "Overflow should not happen in this instance");
+            } else if (zero->getAPValue().sle(constantValue->getAPValue())) {
+              // If x <= positive number (including 0), then we will have crossed
+              // the '0' bounds, creating a disjunction, and therefore we will
+              // just continue. For example x sle 1 -> (x <= 1) || (2^(b-1) <= 3)
+              continue;
+            } else {
+              // While in the future, it would be nice to have this, for now it's
+              // not necessary.  This is because by ignoring parts of the inequality
+              // mapped into unsigned space, all we're doing is decreasing the chances
+              // of finding a concrete value.  For now, this is too complicated to
+              // justify adding it to the map
+              //insertInLeftBoundedMap(left,
+              //  ConstantExpr::alloc(2^(constantValue->getWidth()-1),constantValue->getWidth()),
+              //  leftBounded);
+            }
           } else if (kind == Expr::Ult &&
                      oneTooBig->getAPValue().ult(constantValue->getAPValue())) {
             assert(false && "Overflow should not happen in this instance");
           }
           insertInRightBoundedMap(left, constantValue, rightBounded);
+          // Since we are only in Unsigned space, we know that all values
+          // must be greater than or equal to 0.
+          insertInLeftBoundedMap(left, zero, leftBounded);
         } else if (isa<ConstantExpr>(left)) {
           // ex. (9 < x). Another way of saying this is 10 <= x. We therefore
           // add 1 to the left hand constant in order to have a value that is
           // easier to work with
           ref<ConstantExpr> oneTooSmall = dyn_cast<ConstantExpr>(left);
-          constantValue = oneTooSmall->Add( ConstantExpr::alloc(1,oneTooSmall->getWidth()));
-          if (kind == Expr::Slt &&
-              constantValue->getAPValue().slt(oneTooSmall->getAPValue())) {
-            assert(false && "Overflow should not happen in this instance");
+          constantValue = oneTooSmall->Add(ConstantExpr::alloc(1,oneTooSmall->getWidth()));
+          if (kind == Expr::Slt) {
+            if(constantValue->getAPValue().slt(oneTooSmall->getAPValue())) {
+              assert(false && "Overflow should not happen in this instance");
+            } else if (constantValue->getAPValue().slt(zero->getAPValue())) {
+              // If x > negative number, then we will have crossed the '0' bounds,
+              // creating a disjunction, and therefore we will just continue.
+              // For example -3 sle x -> ((0 <= x) && (x < 2^(b-1)) || (x > ((2^b) -3))
+              continue;
+            } else {
+              //insertInRightBoundedMap(right,
+              //  ConstantExpr::alloc((2^(constantValue->getWidth()-1)-1),constantValue->getWidth()),
+              //  rightBounded);
+            }
           } else if (kind == Expr::Ult &&
                      constantValue->getAPValue().ult(oneTooSmall->getAPValue())) {
             assert(false && "Overflow should not happen in this instance");
@@ -252,10 +284,29 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
         if (isa<ConstantExpr>(right)) {
           // x <=10
           constantValue = dyn_cast<ConstantExpr>(right);
+          if (kind == Expr::Sle) {
+            if (zero->getAPValue().sle(constantValue->getAPValue())) {
+              // If x < 0, then we will have crossed the 0 bounds, creating
+              // a disjunction, and therefore we will just continue.
+              continue;
+            } else {
+              //insertInLeftBoundedMap(left,
+               // ConstantExpr::alloc(2^(constantValue->getWidth()-1),constantValue->getWidth()),
+               // leftBounded);
+            }
+          }
           insertInRightBoundedMap(left, constantValue, rightBounded);
+          insertInLeftBoundedMap(left, zero, leftBounded);
         } else if (isa<ConstantExpr>(left)) {
           // 10 <=x
           constantValue = dyn_cast<ConstantExpr>(left);
+          if (constantValue->getAPValue().slt(zero->getAPValue())) {
+            continue; //Crossed the 0 bounds for signed operations
+          } else {
+            //insertInRightBoundedMap(right,
+            //  ConstantExpr::alloc((2^(constantValue->getWidth()-1)-1),constantValue->getWidth()),
+            //  rightBounded);
+          }
           insertInLeftBoundedMap(right, constantValue, leftBounded);
         }
       } else {
