@@ -119,10 +119,7 @@ void insertInRightBoundedMap (ref<Expr> key, ref<ConstantExpr> value,
 
 // A better name for this function may be "removeRedundantInformationInE
 // AlreadyContainedInTheConstraintManager", but that's clearly a little too
-// long. This shows, however, that simplifyExpr is about using concrete
-// information already in the ConstraintManager to remove bits that incoming
-// constraints that are more general than what is already in the constraint
-// list. An example would be e > 7 when e is already concretely determined
+// long. An example would be e > 7 when e is already concretely determined
 // to be 8. Basically, we are eliminating pieces of e that do not actually
 // constrain the state any further.
 ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
@@ -133,10 +130,10 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
   // The two "bound" maps are used to track the left and right bounds
   // that a variable's range could possibly be. Should the left and right
   // bounds be constrained to a single value, then we will be able to
-  // concretize the variable leading to what is hopefully a useful
-  // simplification.  These maps keep track of the unsigned values of
-  // variables only.  This means that signed values have to be mapped into
-  // unsigned space.
+  // concretize the variable hopefully leading to many other useful
+  // simplifications.
+  // Note: These maps keep track of the unsigned values of variables only.
+  // This means that signed values have to be mapped into unsigned space.
   std::map< ref<Expr>, ref<ConstantExpr> > leftBounded; //3 < x or 4 <= 6
   std::map< ref<Expr>, ref<ConstantExpr> > rightBounded; //x < 9 or x <= 17
   
@@ -174,7 +171,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
       if (isa<ConstantExpr>(ee->left) && cast<ConstantExpr>(ee->left)->isFalse()
           && ee->right->getKind() != Expr::Eq) {
         // If the top level is false, it's possible the constraint is of the
-        // form (false (> x... y...) ) which we can use.
+        // form (false (> x... y...) ) which we can use below.
         expr = ee->right;
         topFalse = true;
       } else {
@@ -197,10 +194,12 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
       ref<Expr> left, right;
       Expr::Kind kind = expr->getKind();
       if (topFalse) {
-        // If the top negated the type of expression (ex. (= false (9 < x))
-        // actually means (x <= 9) then we need to change <= to < and < to <=
-        // and flip the children. This maintains the canonical form used
-        // throughout klee
+        // If the top of the expression was false (ex. (= false (9 < x)))
+        // then we can rewrite it to get rid of the false (ex. (x <= 9)).
+        // In order to maintain the canonical form of klee, we
+        // 1) drop the false
+        // 2) flip the children (left becomes right and right becomes left
+        // 3) Change <= to < and < to <=
         if (kind == Expr::Ult) {
           kind = Expr::Ule;
         } else if (kind == Expr::Ule) {
@@ -224,25 +223,32 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
       ref<ConstantExpr> zero = ConstantExpr::alloc(0, left->getWidth());
       if (kind == Expr::Ult || kind == Expr::Slt) {
         if (isa<ConstantExpr>(right)) {
-          // ex. (x < 10). Another way of saying this is x <= 0. We therefore
+          // ex. (x < 10). Another way of saying this is x <= 9. We therefore
           // subtract 1 to the left hand constant in order to have a value that is
           // easier to work with
           ref<ConstantExpr> oneTooBig = dyn_cast<ConstantExpr>(right);
           constantValue = oneTooBig->Sub(ConstantExpr::alloc(1,oneTooBig->getWidth()));
           if (kind == Expr::Slt) {
             if (oneTooBig->getAPValue().slt(constantValue->getAPValue())){
+              // For example, with 3 bits, -4 (100) - 1 = 3 (011)
+              // This would necessitate a comparison like x < min or x > max
+              // which would cause a compiler warning.
               assert(false && "Overflow should not happen in this instance");
             } else if (zero->getAPValue().sle(constantValue->getAPValue())) {
-              // If x <= positive number (including 0), then we will have crossed
-              // the '0' bounds, creating a disjunction, and therefore we will
-              // just continue. For example x sle 1 -> (x <= 1) || (2^(b-1) <= 3)
+              // If the constraint is (x <= non-negative number (including 0)),
+              // then we will have crossed the '0' bounds, creating a disjunction,
+              // and therefore we will just continue.
+              // For example x sle 1 -> (x <= 1) || (2^(b-1) <= 3) which is too
+              // difficult to be worth dealing with.
               continue;
             } else {
+              // If x <= negative number then we also know x >= min signed.  The line
+              // below maps this into unsigned space.
               // While in the future, it would be nice to have this, for now it's
-              // not necessary.  This is because by ignoring parts of the inequality
-              // mapped into unsigned space, all we're doing is decreasing the chances
-              // of finding a concrete value.  For now, this is too complicated to
-              // justify adding it to the map
+              // not necessary.  It's not necessary because by ignoring parts of the
+              // inequality, all we're doing is decreasing the chances of finding a
+              // concrete value.  For now, this is too complicated to justify adding
+              // it to the map.
               //insertInLeftBoundedMap(left,
               //  ConstantExpr::alloc(2^(constantValue->getWidth()-1),constantValue->getWidth()),
               //  leftBounded);
@@ -252,8 +258,8 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
             assert(false && "Overflow should not happen in this instance");
           }
           insertInRightBoundedMap(left, constantValue, rightBounded);
-          // Since we are only in Unsigned space, we know that all values
-          // must be greater than or equal to 0.
+          // Since we are only in unsigned space, we know that all values
+          // must at least greater than or equal to 0.
           insertInLeftBoundedMap(left, zero, leftBounded);
         } else if (isa<ConstantExpr>(left)) {
           // ex. (9 < x). Another way of saying this is 10 <= x. We therefore
@@ -263,13 +269,20 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
           constantValue = oneTooSmall->Add(ConstantExpr::alloc(1,oneTooSmall->getWidth()));
           if (kind == Expr::Slt) {
             if(constantValue->getAPValue().slt(oneTooSmall->getAPValue())) {
+              // For example, with 3 bits, 3 (011) + 1 = -4 (100)
+              // This would imply a comparison like x < min or x > max
+              // which would cause a compiler warning.
               assert(false && "Overflow should not happen in this instance");
             } else if (constantValue->getAPValue().slt(zero->getAPValue())) {
-              // If x > negative number, then we will have crossed the '0' bounds,
-              // creating a disjunction, and therefore we will just continue.
+              // If the constraint is (x > negative number), then we will have
+              // crossed the '0' bounds, creating a disjunction, and therefore we
+              // will just continue.
               // For example -3 sle x -> ((0 <= x) && (x < 2^(b-1)) || (x > ((2^b) -3))
+              // which is much too difficult to be worth dealing with.
               continue;
             } else {
+              // If x >= non-negative number then we also know x <= max signed.  The line
+              // below maps this into unsigned space.
               //insertInRightBoundedMap(right,
               //  ConstantExpr::alloc((2^(constantValue->getWidth()-1)-1),constantValue->getWidth()),
               //  rightBounded);
@@ -279,14 +292,17 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
             assert(false && "Overflow should not happen in this instance");
           }
           insertInLeftBoundedMap(right, constantValue, leftBounded);
+          // Since we are only in unsigned space, we know that all values
+          // must at most less than or equal to max_value.
+          //insertInRightBoundedMap(right, max given bits, rightBounded);
         }
       } else if (kind == Expr::Ule || kind  == Expr::Sle) {
         if (isa<ConstantExpr>(right)) {
-          // x <=10
+          // x <= 10
           constantValue = dyn_cast<ConstantExpr>(right);
           if (kind == Expr::Sle) {
             if (zero->getAPValue().sle(constantValue->getAPValue())) {
-              // If x < 0, then we will have crossed the 0 bounds, creating
+              // If x <= non-negative, then we will have crossed the 0 bounds, creating
               // a disjunction, and therefore we will just continue.
               continue;
             } else {
@@ -298,7 +314,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
           insertInRightBoundedMap(left, constantValue, rightBounded);
           insertInLeftBoundedMap(left, zero, leftBounded);
         } else if (isa<ConstantExpr>(left)) {
-          // 10 <=x
+          // 10 <= x
           constantValue = dyn_cast<ConstantExpr>(left);
           if (constantValue->getAPValue().slt(zero->getAPValue())) {
             continue; //Crossed the 0 bounds for signed operations
@@ -308,6 +324,7 @@ ref<Expr> ConstraintManager::simplifyExpr(ref<Expr> e) const {
             //  rightBounded);
           }
           insertInLeftBoundedMap(right, constantValue, leftBounded);
+          //insertInRightBoundedMap(right, max given bits, rightBounded);
         }
       } else {
         assert(false && "Should be in Klee canonical form and should have all "
