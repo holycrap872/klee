@@ -151,15 +151,27 @@ bool CexCachingSolver::searchForAssignment(KeyType &key, Assignment *&result) {
 
     // Look for a satisfying assignment for a superset, which is trivially an
     // assignment for any subset.
-    Assignment **lookup = cache.findSuperset(key, NonNullAssignment());
+    Assignment **lookup = 0;
+    if (!lookup) {
+      TimerStatIncrementer tSuper(stats::cexUBSuperTime);
+      lookup = cache.findSuperset(key, NonNullAssignment());
+      if (lookup) {
+        ++stats::cexUBSuperHits;
+      }
+    }
 
     // Otherwise, look for a subset which is unsatisfiable -- if the subset is
     // unsatisfiable then no additional constraints can produce a valid
     // assignment. While searching subsets, we also explicitly the solutions for
     // satisfiable subsets to see if they solve the current query and return
     // them if so. This is cheap and frequently succeeds.
-    if (!lookup) 
+    if (!lookup) {
+      TimerStatIncrementer tSub(stats::cexUBSubTime);
       lookup = cache.findSubset(key, NullOrSatisfyingAssignment(key));
+      if (lookup) {
+        ++stats::cexUBSubHits;
+      }
+    }
 
     // If either lookup succeeded, then we have a cached solution.
     if (lookup) {

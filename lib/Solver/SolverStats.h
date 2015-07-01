@@ -27,6 +27,11 @@ namespace stats {
   extern Statistic queryConstructs;
   extern Statistic queryCounterexamples;
   extern Statistic queryTime;
+
+  extern Statistic cexUBSuperHits;
+  extern Statistic cexUBSubHits;
+  extern Statistic cexUBSuperTime;
+  extern Statistic cexUBSubTime;
   
 #ifdef DEBUG
   extern Statistic arrayHashTime;

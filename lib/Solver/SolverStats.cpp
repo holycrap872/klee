@@ -24,6 +24,11 @@ Statistic stats::queryConstructs("QueriesConstructs", "QB");
 Statistic stats::queryCounterexamples("QueriesCEX", "Qcex");
 Statistic stats::queryTime("QueryTime", "Qtime");
 
+Statistic stats::cexUBSuperHits("CexUBSuperHits", "CexSuperH");
+Statistic stats::cexUBSubHits("CexUBSubHits", "CexSubH");
+Statistic stats::cexUBSuperTime("CexUBSuperTime", "CexSuperT");
+Statistic stats::cexUBSubTime("CexUBSubTime", "CexSubT");
+
 #ifdef DEBUG
 Statistic stats::arrayHashTime("ArrayHashTime", "AHtime");
 #endif

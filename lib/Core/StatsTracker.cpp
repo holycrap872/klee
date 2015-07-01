@@ -394,6 +394,10 @@ void StatsTracker::writeStatsHeader() {
              << "'CexCacheTime',"
              << "'ForkTime',"
              << "'ResolveTime',"
+             << "'SuperH',"
+             << "'SubH',"
+             << "'SuperT',"
+             << "'SubT',"
 #ifdef DEBUG
 	     << "'ArrayHashTime',"
 #endif
@@ -428,6 +432,10 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::cexCacheTime / 1000000.
              << "," << stats::forkTime / 1000000.
              << "," << stats::resolveTime / 1000000.
+             << "," << stats::cexUBSuperHits
+             << "," << stats::cexUBSubHits
+             << "," << stats::cexUBSuperTime / 1000000.
+             << "," << stats::cexUBSubTime / 1000000.
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
