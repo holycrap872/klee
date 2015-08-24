@@ -90,7 +90,7 @@ namespace {
  
   cl::opt<bool>
   NoPreferCex("no-prefer-cex",
-              cl::init(false));
+              cl::init(true));
  
   cl::opt<bool>
   UseAsmAddresses("use-asm-addresses",
